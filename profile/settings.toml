@@ -1,0 +1,59 @@
+name = "rubin"
+schema_version = 1
+
+# Selection is cheap triage — rank the shortlist and emit one pick — so it
+# runs on a fast, inexpensive model.
+[phases.select]
+model = "claude-haiku-4-5"
+
+# The working phases run on the most capable Claude model: implement drives
+# the TDD cycle, review/fixup/rebase reason about diffs and conflicts. Human
+# signoff is off so the loop runs unattended (AFK); flip require_human_signoff
+# to true on a phase to gate it behind a `signoff_signal` reaction.
+[phases.implement]
+model = "claude-opus-4-7"
+timeout = 3600
+
+[phases.review]
+model = "claude-opus-4-7"
+timeout = 1800
+require_human_signoff = false
+signoff_signal = "thumbs_up"
+
+[phases.fixup]
+model = "claude-opus-4-7"
+timeout = 1800
+require_human_signoff = false
+signoff_signal = "thumbs_up"
+
+[phases.rebase]
+model = "claude-opus-4-7"
+timeout = 900
+require_human_signoff = false
+signoff_signal = "thumbs_up"
+
+[secrets_required.gh_token]
+description = "GitHub token for pushing branches and posting reviews"
+example = "op://Private/GitHub/token"
+optional = false
+format = "string"
+
+[secrets_required.anthropic_key]
+description = "Anthropic API key (only needed if running stoker against the API rather than Claude Code subscription auth)"
+example = "op://Private/Anthropic/key"
+optional = true
+format = "string"
+
+# SQuaRE signs every commit, so the SSH signing keypair is REQUIRED (not
+# optional as in the default profile). The sandbox cannot produce a valid
+# signed commit without both halves.
+[secrets_required.signing_key_private]
+description = "SSH private key used to sign commits inside the sandbox"
+example = "op://Private/GitHub Agent Signing Key/private key"
+optional = false
+format = "ssh-private"
+
+[secrets_required.signing_key_public]
+description = "SSH public key matching signing_key_private (allowed_signers)"
+example = "op://Private/GitHub Agent Signing Key/public key"
+optional = false

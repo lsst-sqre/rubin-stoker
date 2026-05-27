@@ -26,3 +26,56 @@ But if there are multiple Git branches for a Jira ticket, then add a short descr
 
 Some PRDs are small, and can be created without a Jira ticket. In that case, the Git branch template is `u/<username>/<description>` where `<username>` is the user's GitHub username.
 For example, `u/jonathansick/docs-fix`.
+
+## Profile structure and maintenance
+
+The installable profile lives under `profile/`. `stoker install` vendors it
+into a consuming repo (skills → `.claude/skills/` and `.agents/skills/`,
+prompts → `.stoker/prompts/`, issue templates → `.github/ISSUE_TEMPLATE/`,
+devcontainer → `.devcontainer/`). Install is **replace-not-merge with no
+inheritance**, and this stoker version ships no builtin package-prompt
+fallback, so the profile must ship the **complete** set of skills and prompts —
+including the ones it does not customize.
+
+### Ownership table
+
+The sync script (`scripts/sync-upstream.sh`) is kept in lockstep with this
+table. Rubin-owned files are authored here and never overwritten by the sync;
+verbatim files are pulled from the pinned upstream ref.
+
+| Path | Owner |
+|------|-------|
+| `profile/settings.toml` | **Rubin** — name, phase models, required secrets |
+| `profile/issue_templates/prd.yml`, `prd-task.yml` | **Rubin** — default + optional Jira Key/URL |
+| `profile/skills/stoker-prd/` | **Rubin** — Jira seed + comment |
+| `profile/skills/stoker-prd-to-issues/` | **Rubin** — Rubin branch naming + Jira metadata + comment |
+| `profile/skills/stoker-prd-followup/` | **Rubin** — Jira metadata + comment |
+| `profile/skills/stoker-create-pr/` | **Rubin** — `DM-XXXXX:` title + `Jira:` reference |
+| `profile/devcontainer/Dockerfile` | **Rubin** — Python + uv + SSH signing + tooling |
+| `profile/devcontainer/devcontainer.json` | **Rubin** — + Docker-in-Docker |
+| `profile/devcontainer/firewall-allowlist.txt` | **Rubin** — + Docker Hub CDN / RFC1918 CIDRs |
+| `profile/skills/stoker-work/`, `stoker-implement/`, `stoker-review/`, `stoker-fixup/`, `stoker-rebase/` | verbatim (synced) |
+| `profile/prompts/*.md` | verbatim (synced) |
+| `profile/onboard/project-mechanics.md` | verbatim (synced) |
+| `profile/devcontainer/codex-config.toml` | verbatim (synced) |
+
+The four Rubin-owned skills are **ported from the upstream default skill
+bodies** (which carry the robust multi-task PR logic, sentinel formats, and
+sub-issue/blocker plumbing) with Rubin specifics layered on — not copied from
+the older hand-rolled docverse skills. When bumping the pinned ref, re-port any
+upstream changes to those four skills by hand and review the diff.
+
+### Syncing from upstream
+
+The pinned `jsickcodes/stoker` ref is recorded in `UPSTREAM_STOKER_REF`. Re-run
+`make sync-upstream` to refresh the verbatim files against it, or
+`make sync-upstream STOKER_REF=<ref>` to bump the pin. Always review the
+resulting `git diff`.
+
+### Jira boundary
+
+All Jira reads/comments happen **interactively, on the host**, via the
+Atlassian MCP server, and the Jira-aware skills degrade gracefully when it is
+absent. The sandbox AFK loop is **GitHub-only**: it carries no Jira token, MCP,
+or firewall egress to Jira, and reads the Jira key/URL only from GitHub issue
+metadata that `stoker-prd-to-issues` propagates onto each task.

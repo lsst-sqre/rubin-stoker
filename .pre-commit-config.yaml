@@ -1,0 +1,14 @@
+# Minimal hygiene checks for the profile's YAML / TOML / Markdown content.
+# Kept deliberately light: the bulk of profile/ is verbatim-synced from
+# upstream stoker (see scripts/sync-upstream.sh), which already satisfies
+# these hooks, so they do not introduce drift against upstream.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
