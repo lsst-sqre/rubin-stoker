@@ -11,7 +11,7 @@ help:  ## Show this help
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: sync-upstream
-sync-upstream:  ## Sync verbatim profile files from jsickcodes/stoker@STOKER_REF
+sync-upstream:  ## Fetch upstream base skills into .upstream-cache/ for diffing
 	@if [ -z "$(STOKER_REF)" ]; then \
 		echo "error: STOKER_REF is unset and UPSTREAM_STOKER_REF is missing;" >&2; \
 		echo "       run: make sync-upstream STOKER_REF=<tag|branch|sha>" >&2; \

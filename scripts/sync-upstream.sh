@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
-# Sync the verbatim-from-upstream parts of the Rubin stoker profile from a
-# pinned jsickcodes/stoker ref.
+# Fetch the upstream stoker base bodies for the four Rubin-customized skills
+# into .upstream-cache/skills/ so they can be diffed against profile/skills/*
+# during a re-port. No files under profile/ are ever written.
 #
-# This profile ships the COMPLETE set of stoker skills and prompts (stoker
-# has no builtin package-prompt fallback, and `install` is replace-not-merge
-# with no inheritance — see AGENTS.md). The files that the Rubin profile does
-# not customize are tracked verbatim and mechanically synced here so upstream
-# drift surfaces as a reviewable git diff instead of silent skew.
-#
-# Overwrites ONLY the verbatim files. Never touches the four Rubin-owned
-# skills (stoker-prd, stoker-prd-to-issues, stoker-prd-followup,
-# stoker-create-pr), settings.toml, the issue templates, or the Rubin-owned
-# devcontainer files (Dockerfile, devcontainer.json, firewall-allowlist.txt).
+# Since stoker#192 introduced per-file fallback to the builtin default profile,
+# this profile only ships the files it customizes — there are no verbatim
+# tracked files to overwrite anymore. The four Rubin-owned skills below are
+# ported from the upstream default skill bodies with Rubin specifics layered
+# on; when bumping the pin in UPSTREAM_STOKER_REF, use this script to stage
+# the upstream bodies for `diff -ru` and re-port the Rubin layer by hand.
 #
 # Usage:
-#   make sync-upstream STOKER_REF=<tag|branch|sha>
+#   make sync-upstream                          # re-fetch the pinned ref
+#   make sync-upstream STOKER_REF=<ref>         # bump the pin to <ref>
 #   STOKER_REF=<ref> scripts/sync-upstream.sh
 #
 # Override the source repo (e.g. a local clone, for offline seeding) with:
@@ -31,23 +29,18 @@ if [ -z "${STOKER_REF}" ]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROFILE_DIR="${REPO_ROOT}/profile"
+CACHE_DIR="${REPO_ROOT}/.upstream-cache"
 DEFAULT_SUBDIR="src/stoker/builtin/profiles/default"
 
-# Verbatim sets — keep in lockstep with the ownership table in AGENTS.md.
-VERBATIM_SKILLS=(
-    stoker-work
-    stoker-implement
-    stoker-review
-    stoker-fixup
-    stoker-rebase
-)
-VERBATIM_PROMPTS=(
-    select.md
-    implement.md
-    review.md
-    fixup.md
-    rebase.md
+# The four Rubin-customized skills. Each one is ported from the upstream
+# default body, so we stage the upstream copy here for `diff -ru` during a
+# re-port. Anything else in the upstream default profile is inherited at
+# install time via stoker's per-file fallback and does not need staging.
+PORTED_SKILLS=(
+    stoker-prd
+    stoker-prd-to-issues
+    stoker-prd-followup
+    stoker-create-pr
 )
 
 tmpdir="$(mktemp -d)"
@@ -55,8 +48,9 @@ cleanup() { rm -rf "${tmpdir}"; }
 trap cleanup EXIT
 
 echo "Cloning ${STOKER_REPO} ..."
-git clone --quiet "${STOKER_REPO}" "${tmpdir}/stoker"
-git -C "${tmpdir}/stoker" checkout --quiet "${STOKER_REF}"
+git clone --quiet --depth 1 --no-checkout "${STOKER_REPO}" "${tmpdir}/stoker"
+git -C "${tmpdir}/stoker" fetch --quiet --depth 1 origin "${STOKER_REF}"
+git -C "${tmpdir}/stoker" checkout --quiet FETCH_HEAD
 RESOLVED_SHA="$(git -C "${tmpdir}/stoker" rev-parse HEAD)"
 
 SRC="${tmpdir}/stoker/${DEFAULT_SUBDIR}"
@@ -65,37 +59,29 @@ if [ ! -d "${SRC}" ]; then
     exit 1
 fi
 
-# Prompts (all five, verbatim).
-mkdir -p "${PROFILE_DIR}/prompts"
-for p in "${VERBATIM_PROMPTS[@]}"; do
-    cp "${SRC}/prompts/${p}" "${PROFILE_DIR}/prompts/${p}"
+# Stage the upstream base bodies for the four ported skills.
+rm -rf "${CACHE_DIR}/skills"
+mkdir -p "${CACHE_DIR}/skills"
+for s in "${PORTED_SKILLS[@]}"; do
+    if [ ! -d "${SRC}/skills/${s}" ]; then
+        echo "error: upstream default skill ${s} not found at ${DEFAULT_SUBDIR}/skills/${s} (ref ${STOKER_REF})" >&2
+        exit 1
+    fi
+    cp -R "${SRC}/skills/${s}" "${CACHE_DIR}/skills/${s}"
 done
 
-# Verbatim skills (replace each directory wholesale; the four Rubin-owned
-# skill directories are never named here, so they are left untouched).
-mkdir -p "${PROFILE_DIR}/skills"
-for s in "${VERBATIM_SKILLS[@]}"; do
-    rm -rf "${PROFILE_DIR:?}/skills/${s}"
-    cp -R "${SRC}/skills/${s}" "${PROFILE_DIR}/skills/${s}"
-done
-
-# Onboard interview prompt (verbatim — generic, in lockstep with upstream).
-mkdir -p "${PROFILE_DIR}/onboard"
-cp "${SRC}/onboard/project-mechanics.md" "${PROFILE_DIR}/onboard/project-mechanics.md"
-
-# Codex harness config (verbatim).
-mkdir -p "${PROFILE_DIR}/devcontainer"
-cp "${SRC}/devcontainer/codex-config.toml" "${PROFILE_DIR}/devcontainer/codex-config.toml"
-
-# Record the pinned ref + resolved SHA so the sync is reproducible and the
-# Makefile can default to it on a no-argument re-sync.
+# Update the pin so the next `make sync-upstream` re-fetches the same ref.
 cat > "${REPO_ROOT}/UPSTREAM_STOKER_REF" <<EOF
-# Pinned jsickcodes/stoker ref that the verbatim profile files were synced
-# from. Bump deliberately: re-run \`make sync-upstream STOKER_REF=<ref>\` and
-# review the resulting diff before committing.
+# Pinned jsickcodes/stoker ref that the four Rubin-customized skills were
+# last re-ported against. Bump deliberately: re-run \`make sync-upstream
+# STOKER_REF=<ref>\`, then \`diff -ru .upstream-cache/skills/<skill>
+# profile/skills/<skill>\` to re-port any upstream changes by hand.
 ref = ${STOKER_REF}
 sha = ${RESOLVED_SHA}
 EOF
 
-echo "Synced verbatim profile files from ${STOKER_REF} (${RESOLVED_SHA})."
-echo "Review the result with: git status && git diff"
+echo "Staged upstream base skills from ${STOKER_REF} (${RESOLVED_SHA}) into .upstream-cache/skills/."
+echo "Re-port hints:"
+for s in "${PORTED_SKILLS[@]}"; do
+    echo "  diff -ru .upstream-cache/skills/${s} profile/skills/${s}"
+done

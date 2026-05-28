@@ -67,52 +67,54 @@ firewall egress to Jira.
 
 ## How the profile is organized
 
+Everything not shown here is inherited from the upstream `default` profile
+via stoker's per-file fallback ([jsickcodes/stoker#192](https://github.com/jsickcodes/stoker/pull/192)):
+
 ```
 profile/
 ├── settings.toml                 # name="rubin", phase models, required secrets
-├── prompts/                      # 5 phase prompts (synced verbatim from upstream)
 ├── skills/
-│   ├── stoker-prd/               # Rubin-owned: Jira seed + comment
-│   ├── stoker-prd-to-issues/     # Rubin-owned: Rubin branch naming + Jira metadata + comment
-│   ├── stoker-prd-followup/      # Rubin-owned: Jira metadata + comment
-│   ├── stoker-create-pr/         # Rubin-owned: DM-XXXXX title + Jira reference
-│   └── stoker-{work,implement,review,fixup,rebase}/   # synced verbatim
-├── issue_templates/              # Rubin-owned: default + optional Jira Key/URL
-├── onboard/project-mechanics.md  # synced verbatim
+│   ├── stoker-prd/               # Jira seed + comment
+│   ├── stoker-prd-to-issues/     # Rubin branch naming + Jira metadata + comment
+│   ├── stoker-prd-followup/      # Jira metadata + comment
+│   └── stoker-create-pr/         # DM-XXXXX title + Jira reference
+├── issue_templates/              # default + optional Jira Key/URL
+│   ├── prd.yml
+│   └── prd-task.yml
 └── devcontainer/
-    ├── Dockerfile                # Rubin-owned: Python + uv + signing + tooling
-    ├── devcontainer.json         # Rubin-owned: + Docker-in-Docker
-    ├── firewall-allowlist.txt    # Rubin-owned: + Docker Hub CDN / RFC1918 CIDRs
-    └── codex-config.toml         # synced verbatim
+    ├── Dockerfile                # Python + uv + signing + tooling
+    ├── devcontainer.json         # + Docker-in-Docker
+    └── firewall-allowlist.txt    # + Docker Hub CDN / RFC1918 CIDRs
 ```
 
-stoker's `install` is **replace-not-merge with no inheritance**, and this
-stoker version ships no builtin package-prompt fallback, so the profile must
-ship the **complete** set of skills and prompts — even the ones it does not
-customize. The un-customized files are tracked verbatim and synced
-mechanically (see below) so upstream drift surfaces as a reviewable diff.
+## Maintaining the profile
 
-## Maintaining the verbatim-synced files
+`stoker install` resolves each profile-relative path against this profile
+first and falls back to the builtin `default` profile per file, so the only
+files that need to live here are the ones Rubin actually customizes (the ten
+listed above). The phase prompts, the un-customized skills
+(`stoker-{work,implement,review,fixup,rebase}`), `onboard/project-mechanics.md`,
+and `devcontainer/codex-config.toml` are all supplied by the builtin default at
+install time.
 
-The files this profile does not customize are pulled from a pinned
-`jsickcodes/stoker` ref recorded in [`UPSTREAM_STOKER_REF`](UPSTREAM_STOKER_REF):
+The four customized skills above are **ported from the upstream default skill
+bodies** with Rubin specifics layered on. Bump
+[`UPSTREAM_STOKER_REF`](UPSTREAM_STOKER_REF) when you want to re-port against
+a newer stoker; otherwise leave it alone — there is no longer any verbatim
+sync to keep current.
 
 ```sh
-# Re-sync the pinned ref (no drift expected if nothing changed upstream):
+# Pull the upstream base skills into .upstream-cache/skills/ for diffing:
 make sync-upstream
+diff -ru .upstream-cache/skills/stoker-prd profile/skills/stoker-prd
 
-# Bump to a newer upstream ref and review the diff:
+# Bump to a newer upstream ref before re-porting:
 make sync-upstream STOKER_REF=<tag|branch|sha>
-git diff
 ```
 
-The sync overwrites only the verbatim files (the 5 phase prompts, the 5
-verbatim skills, `onboard/project-mechanics.md`, and
-`devcontainer/codex-config.toml`). It never touches the four Rubin-owned
-skills, `settings.toml`, the issue templates, or the Rubin-owned devcontainer
-files. The full ownership table is in [`AGENTS.md`](AGENTS.md).
-
-`make lint` runs the pre-commit hygiene hooks (also enforced in CI).
+`make sync-upstream` never writes anything under `profile/` — the re-port is
+fully manual. `make lint` runs the pre-commit hygiene hooks (also enforced in
+CI).
 
 ## Known limitation: Docker-in-Docker vs the egress firewall
 

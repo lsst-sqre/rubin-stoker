@@ -1,7 +1,8 @@
 # Minimal hygiene checks for the profile's YAML / TOML / Markdown content.
-# Kept deliberately light: the bulk of profile/ is verbatim-synced from
-# upstream stoker (see scripts/sync-upstream.sh), which already satisfies
-# these hooks, so they do not introduce drift against upstream.
+# Kept deliberately light: profile/ ships only the files Rubin customizes
+# (everything else is supplied by stoker's builtin default profile via
+# per-file fallback — see AGENTS.md), so these hooks just gate the small
+# Rubin-owned surface.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

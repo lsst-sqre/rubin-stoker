@@ -1,5 +1,6 @@
-# Pinned jsickcodes/stoker ref that the verbatim profile files were synced
-# from. Bump deliberately: re-run `make sync-upstream STOKER_REF=<ref>` and
-# review the resulting diff before committing.
-ref = 0b456393d6229197fe6c2a238c847a00911cda5b
-sha = 0b456393d6229197fe6c2a238c847a00911cda5b
+# Pinned jsickcodes/stoker ref that the four Rubin-customized skills were
+# last re-ported against. Bump deliberately: re-run `make sync-upstream
+# STOKER_REF=<ref>`, then `diff -ru .upstream-cache/skills/<skill>
+# profile/skills/<skill>` to re-port any upstream changes by hand.
+ref = b39a2abe233a2d75054d9f10279ad35d29ce36f7
+sha = b39a2abe233a2d75054d9f10279ad35d29ce36f7

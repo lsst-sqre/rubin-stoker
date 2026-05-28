@@ -29,48 +29,52 @@ For example, `u/jonathansick/docs-fix`.
 
 ## Profile structure and maintenance
 
-The installable profile lives under `profile/`. `stoker install` vendors it
-into a consuming repo (skills → `.claude/skills/` and `.agents/skills/`,
-prompts → `.stoker/prompts/`, issue templates → `.github/ISSUE_TEMPLATE/`,
-devcontainer → `.devcontainer/`). Install is **replace-not-merge with no
-inheritance**, and this stoker version ships no builtin package-prompt
-fallback, so the profile must ship the **complete** set of skills and prompts —
-including the ones it does not customize.
+The installable profile lives under `profile/`. `stoker install` resolves
+profile files **per-relative-path with fallback to the builtin `default`
+profile**: the active profile's copy wins, and the builtin copy fills any gap
+(see `src/stoker/profile/fallback.py` upstream, introduced in
+[jsickcodes/stoker#192](https://github.com/jsickcodes/stoker/pull/192) and
+documented in `docs/design.md`). Single-file sources (phase prompts, onboard
+prompts, individual devcontainer files) and directory sources (`skills/`,
+`prompts/`, `issue_templates/`) all layer the same way; `settings.toml` is the
+one exception — it is layered separately by the config loader. The practical
+consequence: this profile only needs to ship the files it actually
+customizes, and the builtin default supplies everything else at install time.
 
-### Ownership table
+### Rubin-owned files
 
-The sync script (`scripts/sync-upstream.sh`) is kept in lockstep with this
-table. Rubin-owned files are authored here and never overwritten by the sync;
-verbatim files are pulled from the pinned upstream ref.
+Everything in `profile/` is Rubin-owned by definition. There are ten of them:
 
-| Path | Owner |
-|------|-------|
-| `profile/settings.toml` | **Rubin** — name, phase models, required secrets |
-| `profile/issue_templates/prd.yml`, `prd-task.yml` | **Rubin** — default + optional Jira Key/URL |
-| `profile/skills/stoker-prd/` | **Rubin** — Jira seed + comment |
-| `profile/skills/stoker-prd-to-issues/` | **Rubin** — Rubin branch naming + Jira metadata + comment |
-| `profile/skills/stoker-prd-followup/` | **Rubin** — Jira metadata + comment |
-| `profile/skills/stoker-create-pr/` | **Rubin** — `DM-XXXXX:` title + `Jira:` reference |
-| `profile/devcontainer/Dockerfile` | **Rubin** — Python + uv + SSH signing + tooling |
-| `profile/devcontainer/devcontainer.json` | **Rubin** — + Docker-in-Docker |
-| `profile/devcontainer/firewall-allowlist.txt` | **Rubin** — + Docker Hub CDN / RFC1918 CIDRs |
-| `profile/skills/stoker-work/`, `stoker-implement/`, `stoker-review/`, `stoker-fixup/`, `stoker-rebase/` | verbatim (synced) |
-| `profile/prompts/*.md` | verbatim (synced) |
-| `profile/onboard/project-mechanics.md` | verbatim (synced) |
-| `profile/devcontainer/codex-config.toml` | verbatim (synced) |
+- `profile/settings.toml` — name, phase models, required secrets.
+- `profile/issue_templates/prd.yml`, `prd-task.yml` — default fields + optional
+  Jira Key/URL.
+- `profile/skills/stoker-prd/SKILL.md` — Jira seed + comment.
+- `profile/skills/stoker-prd-to-issues/SKILL.md` — Rubin branch naming + Jira
+  metadata + comment.
+- `profile/skills/stoker-prd-followup/SKILL.md` — Jira metadata + comment.
+- `profile/skills/stoker-create-pr/SKILL.md` — `DM-XXXXX:` title + `Jira:`
+  reference.
+- `profile/devcontainer/Dockerfile` — Python + uv + SSH signing + tooling.
+- `profile/devcontainer/devcontainer.json` — + Docker-in-Docker.
+- `profile/devcontainer/firewall-allowlist.txt` — + Docker Hub CDN / RFC1918
+  CIDRs.
 
-The four Rubin-owned skills are **ported from the upstream default skill
-bodies** (which carry the robust multi-task PR logic, sentinel formats, and
-sub-issue/blocker plumbing) with Rubin specifics layered on — not copied from
-the older hand-rolled docverse skills. When bumping the pinned ref, re-port any
-upstream changes to those four skills by hand and review the diff.
+The four Rubin-owned `stoker-{prd,prd-to-issues,prd-followup,create-pr}`
+skills are **ported from the upstream default skill bodies** (which carry the
+robust multi-task PR logic, sentinel formats, and sub-issue/blocker plumbing)
+with Rubin specifics layered on — not copied from the older hand-rolled
+docverse skills. When bumping the pinned upstream ref, re-port any upstream
+changes to those four skills by hand using the diff workflow below.
 
 ### Syncing from upstream
 
-The pinned `jsickcodes/stoker` ref is recorded in `UPSTREAM_STOKER_REF`. Re-run
-`make sync-upstream` to refresh the verbatim files against it, or
-`make sync-upstream STOKER_REF=<ref>` to bump the pin. Always review the
-resulting `git diff`.
+The pinned `jsickcodes/stoker` ref lives in `UPSTREAM_STOKER_REF`. There are
+no verbatim files to overwrite anymore, so `make sync-upstream` is a
+**diff-only fetch**: it shallow-clones stoker at the pinned ref (or
+`make sync-upstream STOKER_REF=<ref>` to bump the pin) and copies the four
+upstream base skills into a gitignored `.upstream-cache/skills/` so you can
+`diff -ru` them against the corresponding `profile/skills/*` directory during
+a re-port. Nothing under `profile/` is ever written by the script.
 
 ### Jira boundary
 
