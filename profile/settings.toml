@@ -11,23 +11,27 @@ model = "claude-haiku-4-5"
 # signoff is off so the loop runs unattended (AFK); flip require_human_signoff
 # to true on a phase to gate it behind a `signoff_signal` reaction.
 [phases.implement]
-model = "claude-opus-4-7"
+model = "claude-opus-4-8"
+effort = "xhigh"
 timeout = 3600
 
 [phases.review]
-model = "claude-opus-4-7"
+model = "claude-opus-4-8"
+effort = "xhigh"
 timeout = 1800
 require_human_signoff = false
 signoff_signal = "thumbs_up"
 
 [phases.fixup]
-model = "claude-opus-4-7"
+model = "claude-opus-4-8"
+effort = "xhigh"
 timeout = 1800
 require_human_signoff = false
 signoff_signal = "thumbs_up"
 
 [phases.rebase]
-model = "claude-opus-4-7"
+model = "claude-opus-4-8"
+effort = "xhigh"
 timeout = 900
 require_human_signoff = false
 signoff_signal = "thumbs_up"
