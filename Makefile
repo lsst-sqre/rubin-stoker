@@ -20,5 +20,5 @@ sync-upstream:  ## Fetch upstream base skills into .upstream-cache/ for diffing
 	STOKER_REF=$(STOKER_REF) scripts/sync-upstream.sh
 
 .PHONY: lint
-lint:  ## Run pre-commit across all files
-	pre-commit run --all-files
+lint:  ## Run prek across all files (via uvx, no pre-install needed)
+	uvx prek run --all-files

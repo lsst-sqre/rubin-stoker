@@ -113,8 +113,7 @@ make sync-upstream STOKER_REF=<tag|branch|sha>
 ```
 
 `make sync-upstream` never writes anything under `profile/` — the re-port is
-fully manual. `make lint` runs the pre-commit hygiene hooks (also enforced in
-CI).
+fully manual. `make lint` runs the prek hygiene hooks (also enforced in CI).
 
 ## Known limitation: Docker-in-Docker vs the egress firewall
 
