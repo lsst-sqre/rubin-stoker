@@ -55,7 +55,13 @@ Everything in `profile/` is Rubin-owned by definition. There are ten of them:
 - `profile/skills/stoker-create-pr/SKILL.md` — `DM-XXXXX:` title + `Jira:`
   reference.
 - `profile/devcontainer/Dockerfile` — Python + uv + SSH signing + tooling.
-- `profile/devcontainer/devcontainer.json` — + Docker-in-Docker.
+- `profile/devcontainer/devcontainer.json` — + Docker-in-Docker. Note: the
+  docker-in-docker feature's `docker-init.sh` runs as PID 1 and only starts
+  dockerd cleanly when it is root, so this file sets `containerUser: "root"`
+  (while keeping `remoteUser: "vscode"` for unprivileged lifecycle/agent
+  commands). Do not drop `containerUser` when re-porting — without it the
+  sandbox fails to come up (`Shell server terminated (code: 126)` /
+  `no users found`).
 - `profile/devcontainer/firewall-allowlist.txt` — + Docker Hub CDN / RFC1918
   CIDRs.
 
