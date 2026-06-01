@@ -4,10 +4,18 @@ Rubin Observatory workflow settings for the [Stoker agentic engineering harness]
 *This workflow is experimental.* Contact @jonathansick for details.
 
 This repository is a **stoker profile**: a directory of policy
-(`settings.toml`, prompts, skills, issue templates, onboarding interview, and
-a devcontainer sandbox) that `stoker install` vendors into a consuming
-repository. The profile content lives under [`profile/`](profile/); the
-profile name is `rubin`.
+(`settings.toml`, prompts, skills, issue templates, an onboarding interview,
+and the egress-firewall allowlist) that `stoker install` vendors into a
+consuming repository. The profile content lives under [`profile/`](profile/);
+the profile name is `rubin`.
+
+Stoker no longer ships a static sandbox `devcontainer.json`. Each consuming
+repo keeps its own clean, human-usable `.devcontainer/devcontainer.json`, and
+stoker **derives** its AFK sandbox into `.devcontainer/stoker/devcontainer.json`
+from it (see [jsickcodes/stoker#207](https://github.com/jsickcodes/stoker/pull/207)
+and `AGENTS.md`). This profile's job is to teach `stoker onboard devcontainer`
+the Rubin defaults and to ship the firewall allowlist — not to own a
+devcontainer.
 
 ## Installing the profile
 
@@ -81,32 +89,41 @@ profile/
 ├── issue_templates/              # default + optional Jira Key/URL
 │   ├── prd.yml
 │   └── prd-task.yml
+├── onboard/
+│   └── devcontainer.md           # Rubin onboarding: Python+uv, DinD rule, signing
 └── devcontainer/
-    ├── Dockerfile                # Python + uv + signing + tooling
-    ├── devcontainer.json         # + Docker-in-Docker
     └── firewall-allowlist.txt    # + Docker Hub CDN / RFC1918 CIDRs
 ```
+
+That is the complete set of nine Rubin-owned files. There is no profile
+`devcontainer.json` or `Dockerfile`: the sandbox is derived from each repo's
+own human devcontainer, and the no-source fallback Dockerfile (Python + uv) +
+`codex-config.toml` come from the builtin `default` profile.
 
 ## Maintaining the profile
 
 `stoker install` resolves each profile-relative path against this profile
 first and falls back to the builtin `default` profile per file, so the only
-files that need to live here are the ones Rubin actually customizes (the ten
+files that need to live here are the ones Rubin actually customizes (the nine
 listed above). The phase prompts, the un-customized skills
 (`stoker-{work,implement,review,fixup,rebase}`), `onboard/project-mechanics.md`,
-and `devcontainer/codex-config.toml` are all supplied by the builtin default at
+the no-source fallback `devcontainer/Dockerfile` (Python + uv), and
+`devcontainer/codex-config.toml` are all supplied by the builtin default at
 install time.
 
-The four customized skills above are **ported from the upstream default skill
-bodies** with Rubin specifics layered on. Bump
+The four customized skills and `onboard/devcontainer.md` are **ported from the
+upstream default bodies** with Rubin specifics layered on. Bump
 [`UPSTREAM_STOKER_REF`](UPSTREAM_STOKER_REF) when you want to re-port against
 a newer stoker; otherwise leave it alone — there is no longer any verbatim
-sync to keep current.
+sync to keep current. The pinned ref **must** be a stoker that inherits
+`containerUser` / `privileged` in the sandbox derive (see `AGENTS.md`), or
+Docker-in-Docker silently breaks in the sandbox.
 
 ```sh
-# Pull the upstream base skills into .upstream-cache/skills/ for diffing:
+# Pull the upstream base skills + onboard prompt into .upstream-cache/ for diffing:
 make sync-upstream
 diff -ru .upstream-cache/skills/stoker-prd profile/skills/stoker-prd
+diff -u .upstream-cache/onboard/devcontainer.md profile/onboard/devcontainer.md
 
 # Bump to a newer upstream ref before re-porting:
 make sync-upstream STOKER_REF=<tag|branch|sha>
@@ -117,14 +134,18 @@ fully manual. `make lint` runs the prek hygiene hooks (also enforced in CI).
 
 ## Known limitation: Docker-in-Docker vs the egress firewall
 
-The sandbox enables Docker-in-Docker so testcontainers can run inside the AFK
-loop, and the firewall allowlist adds the Docker Hub CDN (Cloudflare) ranges
-plus the RFC1918 private ranges that container/testcontainer traffic uses
-after port DNAT. The sandbox's `init-firewall.sh` is owned by the stoker
-*package* (not this profile) and flushes/reinstalls the `OUTPUT` chain on
-every run and every 15 minutes via cron. dockerd's own rules live on the
-`FORWARD`/`nat` chains, so the two should not collide — but this combination
-has not yet been validated end-to-end in a live sandbox. If image pulls or
-testcontainer connections fail, check `journalctl -k | grep STOKER-EGRESS-DROP`
-for the blocked destination and widen the allowlist, or re-apply docker's
-iptables rules after the firewall init.
+When a consuming repo's human devcontainer enables Docker-in-Docker (the
+`docker-in-docker` Feature + `containerUser: root` + `privileged: true`),
+stoker's derive carries that into the AFK sandbox so testcontainers can run
+inside the loop. This profile's firewall allowlist adds the Docker Hub CDN
+(Cloudflare) ranges plus the RFC1918 private ranges that container/
+testcontainer traffic uses after port DNAT. The sandbox's `init-firewall.sh`
+is owned by the stoker *package* (shipped to
+`.devcontainer/stoker/init-firewall.sh`, where it reads the relocated
+`.devcontainer/stoker/firewall-allowlist.txt`), and it flushes/reinstalls the
+`OUTPUT` chain on every run and every 15 minutes via cron. dockerd's own rules
+live on the `FORWARD`/`nat` chains, so the two should not collide — but this
+combination has not yet been validated end-to-end in a live sandbox. If image
+pulls or testcontainer connections fail, check
+`journalctl -k | grep STOKER-EGRESS-DROP` for the blocked destination and widen
+the allowlist, or re-apply docker's iptables rules after the firewall init.

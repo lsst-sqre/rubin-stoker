@@ -2,5 +2,5 @@
 # last re-ported against. Bump deliberately: re-run `make sync-upstream
 # STOKER_REF=<ref>`, then `diff -ru .upstream-cache/skills/<skill>
 # profile/skills/<skill>` to re-port any upstream changes by hand.
-ref = b39a2abe233a2d75054d9f10279ad35d29ce36f7
-sha = b39a2abe233a2d75054d9f10279ad35d29ce36f7
+ref = d357a6694c63581f887cef17293512d57b53a7a8
+sha = d357a6694c63581f887cef17293512d57b53a7a8

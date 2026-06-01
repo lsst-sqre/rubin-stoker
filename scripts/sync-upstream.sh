@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Fetch the upstream stoker base bodies for the four Rubin-customized skills
-# into .upstream-cache/skills/ so they can be diffed against profile/skills/*
-# during a re-port. No files under profile/ are ever written.
+# into .upstream-cache/skills/ — and the onboard prompt into
+# .upstream-cache/onboard/ — so they can be diffed against profile/skills/* and
+# profile/onboard/* during a re-port. No files under profile/ are ever written.
 #
 # Since stoker#192 introduced per-file fallback to the builtin default profile,
 # this profile only ships the files it customizes — there are no verbatim
@@ -70,6 +71,18 @@ for s in "${PORTED_SKILLS[@]}"; do
     cp -R "${SRC}/skills/${s}" "${CACHE_DIR}/skills/${s}"
 done
 
+# Stage the upstream onboard/devcontainer.md too. The Rubin onboard prompt
+# (profile/onboard/devcontainer.md) is ported from this upstream body with the
+# Rubin two-devcontainer / DinD / signing layer added, so it needs the same
+# `diff -ru` re-port path as the four skills above.
+rm -rf "${CACHE_DIR}/onboard"
+mkdir -p "${CACHE_DIR}/onboard"
+if [ ! -f "${SRC}/onboard/devcontainer.md" ]; then
+    echo "error: upstream onboard prompt not found at ${DEFAULT_SUBDIR}/onboard/devcontainer.md (ref ${STOKER_REF})" >&2
+    exit 1
+fi
+cp "${SRC}/onboard/devcontainer.md" "${CACHE_DIR}/onboard/devcontainer.md"
+
 # Update the pin so the next `make sync-upstream` re-fetches the same ref.
 cat > "${REPO_ROOT}/UPSTREAM_STOKER_REF" <<EOF
 # Pinned jsickcodes/stoker ref that the four Rubin-customized skills were
@@ -80,8 +93,9 @@ ref = ${STOKER_REF}
 sha = ${RESOLVED_SHA}
 EOF
 
-echo "Staged upstream base skills from ${STOKER_REF} (${RESOLVED_SHA}) into .upstream-cache/skills/."
+echo "Staged upstream base skills + onboard prompt from ${STOKER_REF} (${RESOLVED_SHA}) into .upstream-cache/."
 echo "Re-port hints:"
 for s in "${PORTED_SKILLS[@]}"; do
     echo "  diff -ru .upstream-cache/skills/${s} profile/skills/${s}"
 done
+echo "  diff -u .upstream-cache/onboard/devcontainer.md profile/onboard/devcontainer.md"
