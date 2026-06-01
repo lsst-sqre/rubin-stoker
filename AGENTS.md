@@ -92,9 +92,20 @@ Everything in `profile/` is Rubin-owned by definition. There are nine of them
 - `profile/skills/stoker-create-pr/SKILL.md` — `DM-XXXXX:` title + `Jira:`
   reference.
 - `profile/devcontainer/firewall-allowlist.txt` — + Docker Hub CDN / RFC1918
-  CIDRs (for DinD/testcontainers egress; no builtin equivalent). The package
-  `init-firewall.sh` reads it from `.devcontainer/stoker/firewall-allowlist.txt`
-  after the sandbox component relocates it there.
+  CIDRs (for DinD/testcontainers egress; no builtin equivalent). Docker Hub's
+  pull path is three hops across two clouds: auth on Cloudflare, manifest
+  (`registry-1.docker.io`) on AWS compute via a `getent` snapshot, and blobs on
+  **either** Cloudflare (`production.cloudflare.docker.com`) **or** AWS
+  CloudFront (`production.cloudfront.docker.com`) — so the allowlist ships both
+  the Cloudflare edge CIDRs **and** the AWS CloudFront GLOBAL edge CIDRs (the
+  latter added after a live `docker pull` dropped on CloudFront's `18.67.17.x`).
+  This is a static snapshot of a moving target; the robust fix (GHCR mirror /
+  non-Docker-Hub images) is tracked in
+  [jsickcodes/stoker#217](https://github.com/jsickcodes/stoker/issues/217).
+  Drops are diagnosed with `sudo dmesg | grep STOKER-EGRESS-DROP` (the sandbox
+  has no `journalctl`). The package `init-firewall.sh` reads the allowlist from
+  `.devcontainer/stoker/firewall-allowlist.txt` after the sandbox component
+  relocates it there.
 - `profile/onboard/devcontainer.md` — Rubin-flavored `stoker onboard
   devcontainer` prompt: Python + uv defaults (`postCreateCommand: uv sync`),
   and the **DinD rule** — a repo running testcontainers must add the

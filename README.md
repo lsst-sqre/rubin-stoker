@@ -137,15 +137,44 @@ fully manual. `make lint` runs the prek hygiene hooks (also enforced in CI).
 When a consuming repo's human devcontainer enables Docker-in-Docker (the
 `docker-in-docker` Feature + `containerUser: root` + `privileged: true`),
 stoker's derive carries that into the AFK sandbox so testcontainers can run
-inside the loop. This profile's firewall allowlist adds the Docker Hub CDN
-(Cloudflare) ranges plus the RFC1918 private ranges that container/
-testcontainer traffic uses after port DNAT. The sandbox's `init-firewall.sh`
-is owned by the stoker *package* (shipped to
-`.devcontainer/stoker/init-firewall.sh`, where it reads the relocated
-`.devcontainer/stoker/firewall-allowlist.txt`), and it flushes/reinstalls the
-`OUTPUT` chain on every run and every 15 minutes via cron. dockerd's own rules
-live on the `FORWARD`/`nat` chains, so the two should not collide — but this
-combination has not yet been validated end-to-end in a live sandbox. If image
-pulls or testcontainer connections fail, check
-`journalctl -k | grep STOKER-EGRESS-DROP` for the blocked destination and widen
-the allowlist, or re-apply docker's iptables rules after the firewall init.
+inside the loop. dockerd runs in the sandbox's root netns, so its *own* pull
+egress is governed by the package `init-firewall.sh`, which installs an
+allowlist on the filter `OUTPUT` chains only (verified: it never touches
+`nat`/`FORWARD`, so it does not break dockerd's container forwarding). It
+flushes/reinstalls those chains on every run and every 15 minutes via cron,
+reading the relocated `.devcontainer/stoker/firewall-allowlist.txt`.
+
+A Docker Hub `docker pull` is a **three-hop, two-cloud** path, and the
+allowlist must cover all of it:
+
+| Hop | Host | Backend | Allowlist coverage |
+|-----|------|---------|--------------------|
+| auth | `auth.docker.io` | Cloudflare | Cloudflare CIDRs |
+| manifest | `registry-1.docker.io` | AWS compute | `getent` snapshot of the rotating IPs (refreshed by cron) |
+| blobs | `production.cloudflare.docker.com` **or** `production.cloudfront.docker.com` | Cloudflare **or** AWS CloudFront | Cloudflare CIDRs **+ AWS CloudFront GLOBAL CIDRs** |
+
+This profile's allowlist therefore ships the RFC1918 ranges (container/
+testcontainer traffic after port DNAT), the Cloudflare edge CIDRs, **and** the
+AWS CloudFront GLOBAL edge CIDRs (94 v4 + 30 v6). The CloudFront block is the
+one added after live validation: Docker had silently moved `postgres:17`'s
+blobs from Cloudflare to CloudFront (`18.67.17.89`), and a CloudFront-less
+allowlist dropped the blob fetch with `connect: network is unreachable`. With
+the CloudFront ranges in place, `docker pull postgres:17` and the testcontainers
+suite come up in the sandbox.
+
+**Residual fragility (tracked in
+[jsickcodes/stoker#217](https://github.com/jsickcodes/stoker/issues/217)).**
+The CloudFront list is a static snapshot of a moving target — Docker can
+re-route blobs again, AWS adds CloudFront prefixes over time, and the manifest
+hop rides a `getent` snapshot of general AWS-compute IPs. The robust long-term
+fix is to sidestep Docker Hub's CDN entirely by mirroring testcontainer images
+into the org's GHCR (`ghcr.io`/`pkg-containers.githubusercontent.com` are fully
+covered by GitHub `/meta` → zero firewall change) or pulling them from another
+stable, coverable registry.
+
+If image pulls or testcontainer connections fail, find the blocked destination
+with `sudo dmesg | grep STOKER-EGRESS-DROP` — the sandbox is a Debian container
+with **no systemd, so `journalctl` is not installed** — then refresh the
+relevant CIDR block (AWS CloudFront ranges come from
+`https://ip-ranges.amazonaws.com/ip-ranges.json`, `service==CLOUDFRONT &&
+region==GLOBAL`).
