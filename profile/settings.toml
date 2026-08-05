@@ -6,31 +6,32 @@ schema_version = 1
 [phases.select]
 model = "claude-haiku-4-5"
 
-# The working phases run on the most capable Claude model: implement drives
-# the TDD cycle, review/fixup/rebase reason about diffs and conflicts. Human
-# signoff is off so the loop runs unattended (AFK); flip require_human_signoff
-# to true on a phase to gate it behind a `signoff_signal` reaction.
+# The code-writing phases run on Opus 5: implement drives the TDD cycle,
+# fixup/rebase reason about diffs and conflicts. Review runs on Fable 5 so a
+# different model critiques the code than wrote it. Human signoff is off so
+# the loop runs unattended (AFK); flip require_human_signoff to true on a
+# phase to gate it behind a `signoff_signal` reaction.
 [phases.implement]
-model = "claude-opus-4-8"
+model = "claude-opus-5"
 effort = "xhigh"
 timeout = 3600
 
 [phases.review]
-model = "claude-opus-4-8"
+model = "claude-fable-5"
 effort = "xhigh"
 timeout = 1800
 require_human_signoff = false
 signoff_signal = "thumbs_up"
 
 [phases.fixup]
-model = "claude-opus-4-8"
+model = "claude-opus-5"
 effort = "xhigh"
 timeout = 1800
 require_human_signoff = false
 signoff_signal = "thumbs_up"
 
 [phases.rebase]
-model = "claude-opus-4-8"
+model = "claude-opus-5"
 effort = "xhigh"
 timeout = 900
 require_human_signoff = false
