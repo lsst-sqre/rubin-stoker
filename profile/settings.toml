@@ -10,7 +10,9 @@ model = "claude-haiku-4-5"
 # fixup/rebase reason about diffs and conflicts. Review runs on Fable 5.1 so
 # a different model critiques the code than wrote it. Opus 5.5 defaults to
 # effort = "medium" (one step below Opus 5), so every phase pins effort
-# explicitly. Human signoff is off so the loop runs unattended (AFK); flip
+# explicitly; review runs at "high" since Fable 5.1 turns are long and a
+# critique pass does not need the xhigh depth the coding phases get.
+# Human signoff is off so the loop runs unattended (AFK); flip
 # require_human_signoff to true on a phase to gate it behind a
 # `signoff_signal` reaction.
 [phases.implement]
@@ -20,7 +22,7 @@ timeout = 3600
 
 [phases.review]
 model = "claude-fable-5-1"
-effort = "xhigh"
+effort = "high"
 timeout = 1800
 require_human_signoff = false
 signoff_signal = "thumbs_up"
